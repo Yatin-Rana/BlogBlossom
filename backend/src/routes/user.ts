@@ -12,7 +12,7 @@ export const userRouter = new Hono<{
   }
 }>()
 
-userRouter.post('/', async (c) => {
+userRouter.post('/signup', async (c) => {
 
 
 
