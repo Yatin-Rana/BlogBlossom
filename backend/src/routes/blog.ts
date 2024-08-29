@@ -4,7 +4,6 @@ import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
 import { createBlogInput, updateBlogInput } from "@ya3/common-medium"
 
-
 export const blogRouter = new Hono<{
     Bindings: {
         DATABASE_URL: string;
@@ -35,10 +34,9 @@ blogRouter.use("/*", async (c, next) => {
         c.status(403)
         return c.json({ message: "you're not logged in " })
     }
-
 })
 
-
+// Create a new blog
 blogRouter.post('/', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
@@ -62,6 +60,7 @@ blogRouter.post('/', async (c) => {
     return c.json({ id: blog.id })
 })
 
+// Update a blog
 blogRouter.put('/', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
@@ -77,7 +76,6 @@ blogRouter.put('/', async (c) => {
     const blog = await prisma.blog.update({
         where: {
             id: body.id
-
         },
         data: {
             title: body.title,
@@ -89,19 +87,21 @@ blogRouter.put('/', async (c) => {
         id: blog.id
     })
 })
+
+// Get all blogs
 blogRouter.get('/bulk', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
     try {
         const blogs = await prisma.blog.findMany({
-            select:{
-                content:true,
-                title:true,
-                id:true,
-                author:{
-                    select:{
-                        name:true
+            select: {
+                content: true,
+                title: true,
+                id: true,
+                author: {
+                    select: {
+                        name: true
                     }
                 }
             }
@@ -115,9 +115,8 @@ blogRouter.get('/bulk', async (c) => {
     }
 })
 
-
+// Get a specific blog by ID
 blogRouter.get('/:id', async (c) => {
-
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
@@ -128,13 +127,13 @@ blogRouter.get('/:id', async (c) => {
             where: {
                 id: Number(id)
             },
-            select:{
-                id:true,
-                title:true,
-                content :true,
-                author:{
-                    select:{
-                        name:true
+            select: {
+                id: true,
+                title: true,
+                content: true,
+                author: {
+                    select: {
+                        name: true
                     }
                 }
             }
@@ -151,5 +150,40 @@ blogRouter.get('/:id', async (c) => {
     }
 })
 
+// Delete a blog
+blogRouter.delete('/:id', async (c) => {
+    const prisma = new PrismaClient({
+        datasourceUrl: c.env.DATABASE_URL,
+    }).$extends(withAccelerate())
+    const id = c.req.param('id');
+    const userId = c.get('userId');
 
+    try {
+        // Find the blog
+        const blog = await prisma.blog.findUnique({
+            where: { id: Number(id) },
+        });
 
+        if (!blog) {
+            c.status(404);
+            return c.json({ message: 'Blog not found' });
+        }
+
+        // Check if the blog belongs to the user
+        if (blog.authorId !== Number(userId)) {
+            c.status(403);
+            return c.json({ message: 'Not authorized to delete this blog' });
+        }
+
+        // Delete the blog
+        await prisma.blog.delete({
+            where: { id: Number(id) },
+        });
+
+        return c.json({ message: 'Blog deleted successfully' });
+    } catch (e) {
+        console.error('Error deleting blog:', e);
+        c.status(500);
+        return c.json({ message: 'Error deleting blog' });
+    }
+});
